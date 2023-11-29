@@ -1,0 +1,8 @@
+<launch>
+	<!-- My Package launch file -->
+	<node pkg="my_controller"
+		type="time_trials.py"
+		name="move_robot" 
+		output="screen">
+	</node>
+</launch>
