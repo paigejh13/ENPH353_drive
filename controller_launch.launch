@@ -5,4 +5,14 @@
 		name="move_robot" 
 		output="screen">
 	</node>
+	<node pkg="my_controller"
+		type="comp_drive.py"
+		name="move_robot2" 
+		output="screen">
+	</node>
+	<node pkg="my_controller"
+		type="image_logger.py"
+		name="move_robot3" 
+		output="screen">
+	</node>
 </launch>
