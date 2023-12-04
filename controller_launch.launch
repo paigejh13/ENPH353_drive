@@ -1,8 +1,15 @@
 <launch>
 	<!-- My Package launch file -->
+	<!--
 	<node pkg="my_controller"
 		type="time_trials.py"
-		name="move_robot" 
+		name="move_robot"
+		output="screen">
+	</node>-->
+
+	<node pkg="my_controller"
+		type="clue_reader.py"
+		name="logImage"
 		output="screen">
 	</node>
 </launch>
