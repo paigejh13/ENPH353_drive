@@ -8,6 +8,7 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import String
 
 do_image = False
+count = 0
 name = "1"
 print("started")
 
@@ -20,14 +21,15 @@ def take_image(a):
 
 
 def imageCallback(data):
-    global do_image, name
+    global do_image, name, count
     if do_image:
         print("b")
         do_image = False
         bridge = CvBridge()
         cv_image = bridge.imgmsg_to_cv2(data, desired_encoding='bgr8')
-        path = '/home/fizzer/ros_ws/src/my_controller/src/ENPH353_drive/signPhotos/test3.jpg'
+        path = '/home/fizzer/ros_ws/src/my_controller/src/Photos/data.jpg'
         print(path)
+        count += 1
         cv2.imwrite(path, cv_image)
 
 
