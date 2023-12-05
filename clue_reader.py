@@ -7,10 +7,16 @@ import numpy as np
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
+from tensorflow.keras import models
 
 SAMPLE_RATE = 3
 
 frameCounter = 1
+currentMaxBound = 0
+currentBest
+
+model = models.load_model('/home/fizzer/ros_ws/src/my_controller/src/ENPH353_drive/model2.h5', compile=False)
+model.compile()
 
 print("started")
 
@@ -44,22 +50,42 @@ def imageCallback(data):
                 corners = createCornerArray(poly)
                 poly = np.array(poly, dtype='float32')
                 matrix = cv2.getPerspectiveTransform(poly, corners)
-                final = cv2.warpPerspective(imageHSV, matrix, (300,150))
+                final = cv2.warpPerspective(imageHSV, matrix, (300,200))
                 img_gray = cv2.cvtColor(final, cv2.COLOR_BGR2GRAY)
                 if img_gray[130,280] < 160:
                     img_gray = ~img_gray
 
-                letters = list()
+                avr = np.average(img_gray)
 
-                for i in range(12):
-                    letters.append(img_gray[90:130, (22*i + (i//4) + 14) : (22*(i+1) + 20 + (i//4))])
+                binImage = cv2.inRange(img_gray, 0, avr*0.75)
+
+                letters = splitLetters(binImage)
+
+                useModel(letters)
 
 
-                cv2.imshow("Test", letters[5])
+                cv2.imshow("Test", binImage)
                 cv2.waitKey(5)
 
-    
+def useModel(letters):
+    global model
+    ref = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    out = list()
+    for l in letters:
+        pred = model.predict(np.expand_dims(l, axis=0))[0]
+        out.append(ref[np.argmax(pred)])
+    return out
 
+
+def splitLetters(clue):
+    letters = list()
+    for i in range(12):
+        a = clue[128:172, (22*i + (i//4) + 14) : (22*(i+1) + 20 + (i//4))]
+        if np.average(a) > 20:
+            letters.append(a)
+        b = str(i)
+        #cv2.imshow(b,a)
+    return letters
 
 def createCornerArray(polygon):
     x = polygon[:,0,0]
@@ -71,7 +97,7 @@ def createCornerArray(polygon):
         right = (x[i] > xav)
         bottom = (y[i] > yav)
         out[i,0] = 300*right
-        out[i,1] = 150 * bottom
+        out[i,1] = 200 * bottom
 
     return np.array(out, dtype='float32')
         
