@@ -13,7 +13,9 @@ SAMPLE_RATE = 3
 
 frameCounter = 1
 currentMaxBound = 0
-currentBest
+currentBestImage = (0,0)
+storedVal = False
+clueCounter = 0
 
 model = models.load_model('/home/fizzer/ros_ws/src/my_controller/src/ENPH353_drive/model2.h5', compile=False)
 model.compile()
@@ -21,7 +23,7 @@ model.compile()
 print("started")
 
 def imageCallback(data):
-    global frameCounter
+    global frameCounter, currentBestImage, currentMaxBound, storedVal, clueCounter
     if frameCounter < SAMPLE_RATE:
         frameCounter += 1
     else:
@@ -43,29 +45,47 @@ def imageCallback(data):
                 maxind = i
             i += 1
 
-        if maxBound > 500 and hierarchy[0,maxind,2] != -1:
+        if maxBound > 500 and hierarchy[0,maxind,2] != -1 and maxBound > currentMaxBound:
             poly = cv2.approxPolyDP(contours[hierarchy[0,maxind,2]], 0.01 * maxBound, True)
             if len(poly) == 4:
+                storedVal = True
+                currentMaxBound = maxBound
+                currentBestImage = (imageHSV, poly)
+                #cv2.imshow("best",currentBestImage[0])
+                #cv2.waitKey(5)
 
-                corners = createCornerArray(poly)
-                poly = np.array(poly, dtype='float32')
-                matrix = cv2.getPerspectiveTransform(poly, corners)
-                final = cv2.warpPerspective(imageHSV, matrix, (300,200))
-                img_gray = cv2.cvtColor(final, cv2.COLOR_BGR2GRAY)
-                if img_gray[130,280] < 160:
-                    img_gray = ~img_gray
-
-                avr = np.average(img_gray)
-
-                binImage = cv2.inRange(img_gray, 0, avr*0.75)
-
-                letters = splitLetters(binImage)
-
-                useModel(letters)
+        elif maxBound < 250 and storedVal:
+            currentMaxBound = 0
+            storedVal = False
+            result = doAnalysis(currentBestImage[0],currentBestImage[1])
+            submitClue(clueCounter, result)
+            clueCounter += 1
 
 
-                cv2.imshow("Test", binImage)
-                cv2.waitKey(5)
+
+def doAnalysis(image, poly):
+    corners = createCornerArray(poly)
+    poly = np.array(poly, dtype='float32')
+    matrix = cv2.getPerspectiveTransform(poly, corners)
+    final = cv2.warpPerspective(image, matrix, (300,200))
+    img_gray = cv2.cvtColor(final, cv2.COLOR_BGR2GRAY)
+    if img_gray[130,280] < 160:
+        img_gray = ~img_gray
+
+    avr = np.average(img_gray)
+
+    binImage = cv2.inRange(img_gray, 0, avr*0.75)
+    #cv2.imshow("test",img_gray)
+    #cv2.waitKey(5)
+
+    letters = splitLetters(binImage)
+
+    word = useModel(letters)
+    return "".join(word)
+
+
+def submitClue(catagory, value):
+    print(value)
 
 def useModel(letters):
     global model
