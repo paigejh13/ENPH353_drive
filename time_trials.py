@@ -22,8 +22,8 @@ control.publish(move)
 time.sleep(5)
 
 move.linear.x = 0
-control.publish(move)
-scoreTracker.publish(stopMessage)
+#control.publish(move)
+#scoreTracker.publish(stopMessage)
 time.sleep(5)
 
 rospy.signal_shutdown("we remain winning")
