@@ -8,6 +8,7 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
 from tensorflow.keras import models
+import time
 
 SAMPLE_RATE = 3
 
@@ -15,10 +16,13 @@ frameCounter = 1
 currentMaxBound = 0
 currentBestImage = (0,0)
 storedVal = False
-clueCounter = 0
+clueCounter = 1
+clueSet = {}
 
 model = models.load_model('/home/fizzer/ros_ws/src/my_controller/src/ENPH353_drive/model2.h5', compile=False)
 model.compile()
+startMessage = str("BestTeam,password,0,clue")
+stopMessage = str("BestTeam,password,-1,clue")
 
 print("started")
 
@@ -57,9 +61,8 @@ def imageCallback(data):
         elif maxBound < 250 and storedVal:
             currentMaxBound = 0
             storedVal = False
-            result = doAnalysis(currentBestImage[0],currentBestImage[1])
-            submitClue(clueCounter, result)
-            clueCounter += 1
+            result, clueNum = doAnalysis(currentBestImage[0],currentBestImage[1])
+            submitClue(clueNum, result)
 
 
 
@@ -81,11 +84,27 @@ def doAnalysis(image, poly):
     letters = splitLetters(binImage)
 
     word = useModel(letters)
-    return "".join(word)
+
+    findClueNum(binImage)
+    return "".join(word), clueNum
+
+def findClueNum(image):
+    ref = {28:1,31:2,12:3,29:4,25:5,22:6,32:7,11:8}
+    letter = image[20:64,120:148]
+    pred = model.predict(np.expand_dims(letter, axis=0))[0]
+    index = np.argmax(pred)
+    clueNum = ref.get(index)
+    if clueNum == None:
+        clueNum = clueCounters
 
 
-def submitClue(catagory, value):
-    print(value)
+
+def submitClue(clueNum, value):
+    if clueNum not in clueSet:
+        clueSet.add(clueNum)
+        message = str("BestTeam,password"+str(clueNum) + clue)
+        scoreTracker.publish(message)
+    
 
 def useModel(letters):
     global model
@@ -125,6 +144,10 @@ def createCornerArray(polygon):
 
 
 rospy.init_node('ClueTracker')
+scoreTracker = rospy.Publisher('/score_tracker', String, queue_size=1)
 control = rospy.Subscriber('/R1/pi_camera/image_raw', Image, imageCallback)
+
+time.sleep(1)
+scoreTracker.publish(startMessage)
 
 rospy.spin()

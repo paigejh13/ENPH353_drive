@@ -1,18 +1,18 @@
 <launch>
 	<!-- My Package launch file -->
 
-	<!--
+	
 	<node pkg="my_controller"
 		type="clue_reader.py"
 		name="clueRead"
 		output="screen">
-	</node>-->
+	</node>
 
-	
+	<!--
 	<node pkg="my_controller"
 		type="comp_drive.py"
 		name="move_robot2" 
 		output="screen">
-	</node>
+	</node>-->
 
 </launch>
