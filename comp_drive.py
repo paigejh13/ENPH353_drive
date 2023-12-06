@@ -15,16 +15,33 @@ left = 0
 right = 1280
 pinkLine = False
 state = 1
-speed = 0.25
+speed = 0.3
 cross_walk_passed = False
 fork_passed = False
+time_in_crosswalk = 0
+in_crosswalk = False
+turn_complete = False 
 
-def check_crosswalk(im):
-  return False
+def check_crosswalk(im): 
+  hsv1 = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
+  mask = cv2.inRange(hsv1, (120, 30, 0), (140, 255, 255))
+  sum = np.sum([mask[700:720, 635:645]])
+  if sum > 200:
+    return True
+  else:
+    return False
 
-def check_pedestrian(im):
-  return False
+def tunnel_detect(im):
+  hsv  = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
+  mask = cv2.inRange(hsv, (110, 0, 100), (120, 255,255))
+  return mask
 
+
+  pinkLineFound = False
+  sum = np.sum([mask[300:600, 0:1280]])
+  if sum > 255*1000:
+      pinkLineFound = True
+  return pinkLineFound, mask
 def check_fork(im):
   return False
 
@@ -40,9 +57,6 @@ def grass(im):
 
   threshold = 0.49812*avg_bright-45.
   _, im = cv2.threshold(im, threshold, 255, cv2.THRESH_BINARY)
-
-  cv2.imshow("image", im)
-  cv2.waitKey(2)
 
   Llist = list()
   Rlist = list()
@@ -72,15 +86,18 @@ def grass(im):
   return avgLeft, avgRight
 
 def pavement(im):
-  global cross_walk_passed, fork_passed
+  global cross_walk_passed, fork_passed, speed, in_crosswalk, time_in_crosswalk
+
   if cross_walk_passed == False:
     if check_crosswalk(im) == True:
-      while check_pedestrian(im) == True:
-        move = Twist()
-        control.publish(move)
-      move = Twist()
-      move.linear.x = 1
-      control.publish(move)
+      in_crosswalk = True
+      speed = 1
+    elif in_crosswalk == True and time_in_crosswalk > 10:
+      in_crosswalk = False
+      cross_walk_passed = True
+      speed = 0.3
+    elif in_crosswalk == True:
+      time_in_crosswalk += 1
   elif fork_passed == False:
     if check_fork(im) == True:
       for i in range(15000):
@@ -88,6 +105,7 @@ def pavement(im):
         move.linear.x = 0.1
         move.angular.z = 0.2
         control.publish(move)
+
 
   im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
 
@@ -119,57 +137,61 @@ def pavement(im):
     avgRight = avgR/len(Rlist)
   else:
     avgRight = 1280
-  return avgLeft, avgRight
+  return avgLeft, avgRight, speed
 
 def off_road(im):
-  for i in range(365000):
-    move = Twist()
-    move.linear.x = 0.1
-    move.angular.z=1
-    control.publish(move)
-  print("turn 1")
-  for i in range(180000):
-    move = Twist()
-    move.linear.x = 1
-    move.angular.z= 0
-    control.publish(move)
-  print("drive")
-  for i in range(15000):
-    move = Twist()
-    move.linear.x = 0
-    move.angular.z=0
-    control.publish(move)
-  print("turn 2")
+  global turn_complete
+  if turn_complete == False:
+    target = 200
+
+  mask = tunnel_detect(im)
+  locations = np.argwhere(mask > 250)
+  if len(locations) > 10000:
+    avg_location = np.average(locations[:,1])
+    target = avg_location+250
+    turn_complete = True
+  elif turn_complete == True: 
+    target = 640
+
   
-  return 120,1160
+  return target+100, target-100
 
 def image_process(cv_image, pinkLine, state, speed):
+  global turn_complete
+  rotated = False
   hsv1 = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)
   mask = cv2.inRange(hsv1, (140, 25, 25), (160, 255,255))
-  pink = cv2.bitwise_and(cv_image,cv_image, mask= mask)
 
   pinkLineFound = False
-  sum = np.sum([pink[620:630, 635:645, 0:2]])
+  sum = np.sum([mask[620:630, 635:645]])
   if sum > 200:
       pinkLineFound = True
         
   if pinkLine == False and pinkLineFound == True:
     pinkLine = True
-    print("pinkLine found")
   elif pinkLine == True and pinkLineFound == False:
     pinkLine = False
     state += 1
-    print("state", state)
-  
+
+  if state == 4 and turn_complete == False:
+    state = 3
   if state == 1:
-    left, right = grass(cv_image)
-    speed = 0.30
+    left, right, speed = pavement(cv_image)
   elif state == 3:
-    left, right = grass(cv_image)
-    speed = 0.4
-  else:
+    left, right = off_road(cv_image)
+    speed = 0.3
+  elif state == 2:
     speed = 0.15
     left, right = grass(cv_image)
+  else: 
+    left, right = grass(cv_image) 
+    if rotated == False and (right - left)/2 + left - 640 >1:
+      left = 100
+      right = 800
+      speed = 0
+    else:
+      rotated = True
+      speed = 0.15 
   return left, right, pinkLine, state, speed
     
 
@@ -182,7 +204,6 @@ def Callback(msg):
     move = Twist()
     move.linear.x = speed
     move.angular.z= -diff/95
-    #print(left, right, diff, move.angular.z)
     control.publish(move)
 
 rospy.init_node('biggerWins')
