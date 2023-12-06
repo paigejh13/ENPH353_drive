@@ -9,9 +9,11 @@
 
 	<node pkg="my_controller"
 		type="clue_reader.py"
-		name="logImage"
+		name="clueRead"
 		output="screen">
 	</node>
+
+	<!--
 	<node pkg="my_controller"
 		type="comp_drive.py"
 		name="move_robot2" 
@@ -21,5 +23,5 @@
 		type="image_logger.py"
 		name="move_robot3" 
 		output="screen">
-	</node>
+	</node>-->
 </launch>
