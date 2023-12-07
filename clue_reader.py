@@ -9,6 +9,7 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import String
 from tensorflow.keras import models
 import time
+from rosgraph_msgs.msg import Clock
 
 SAMPLE_RATE = 3
 
@@ -17,9 +18,9 @@ currentMaxBound = 0
 currentBestImage = (0,0)
 storedVal = False
 clueCounter = 1
-clueSet = {}
+clueSet = set()
 
-model = models.load_model('/home/fizzer/ros_ws/src/my_controller/src/ENPH353_drive/model2.h5', compile=False)
+model = models.load_model('/home/fizzer/ros_ws/src/my_controller/src/model2.h5', compile=False)
 model.compile()
 startMessage = str("BestTeam,password,0,clue")
 stopMessage = str("BestTeam,password,-1,clue")
@@ -31,6 +32,8 @@ def imageCallback(data):
     if frameCounter < SAMPLE_RATE:
         frameCounter += 1
     else:
+        #clocktime = rospy.waitForMessage('/clock', Clock)
+        
         frameCounter = 1
         bridge = CvBridge()
         cv_image = bridge.imgmsg_to_cv2(data, desired_encoding='bgr8')
@@ -84,8 +87,9 @@ def doAnalysis(image, poly):
     letters = splitLetters(binImage)
 
     word = useModel(letters)
+    
 
-    findClueNum(binImage)
+    clueNum = findClueNum(binImage)
     return "".join(word), clueNum
 
 def findClueNum(image):
@@ -93,17 +97,28 @@ def findClueNum(image):
     letter = image[20:64,120:148]
     pred = model.predict(np.expand_dims(letter, axis=0))[0]
     index = np.argmax(pred)
+    print(index)
     clueNum = ref.get(index)
     if clueNum == None:
-        clueNum = clueCounters
+        if clueCounter < 4:
+            clueNum = 3
+        else:
+            clueNum = 4
+
+    return clueNum
 
 
 
 def submitClue(clueNum, value):
-    if clueNum not in clueSet:
-        clueSet.add(clueNum)
-        message = str("BestTeam,password"+str(clueNum) + clue)
+    global clueCounter
+    if value not in clueSet:
+        clueSet.add(value)
+        message = str("BestTeam,password,"+str(clueNum) + ',' + str(value))
         scoreTracker.publish(message)
+        if clueNum == 8:
+            time.sleep(1)
+            scoreTracker.publish(stopMessage)
+        clueCounter += 1
     
 
 def useModel(letters):
@@ -139,13 +154,15 @@ def createCornerArray(polygon):
         out[i,1] = 200 * bottom
 
     return np.array(out, dtype='float32')
-        
+
 
 
 
 rospy.init_node('ClueTracker')
 scoreTracker = rospy.Publisher('/score_tracker', String, queue_size=1)
 control = rospy.Subscriber('/R1/pi_camera/image_raw', Image, imageCallback)
+
+
 
 time.sleep(1)
 scoreTracker.publish(startMessage)

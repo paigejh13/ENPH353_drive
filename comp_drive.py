@@ -141,7 +141,6 @@ def off_road(im):
   global turn_complete
   if turn_complete == False:
     target = 200
-  print("off")
   mask = tunnel_detect(im)
   locations = np.argwhere(mask > 250)
   if len(locations) > 10000:
@@ -159,23 +158,20 @@ def tunnelDrive(im):
   
   tunnelImage = tunnel_detect(im)
   
-  left = tunnelImage[300:320,0:640]
-  right = tunnelImage[300:320,640:1280]
-  cv2.imshow("aaaa",tunnelImage)
-  cv2.imshow("lllll",left)
+  left = tunnelImage[250:320,0:640]
+  right = tunnelImage[250:320,640:1280]
+  
   cv2.waitKey(2)
   locationsL = np.argwhere(left > 250)
   locationsR = np.argwhere(right > 250)
   if len(locationsL) + len(locationsR) < 5000:
     tunnel = False
-  print(len(locationsL) + len(locationsR))
   if len(locationsL) == 0 or len(locationsR) == 0:
     avg_locationL = 100
     avg_locationR = 700
   else:
     avg_locationL = np.average(locationsL[:,1])
     avg_locationR = np.average(locationsR[:,1]) + 640
-  print("a",avg_locationR)
   return avg_locationL, avg_locationR
 
 
@@ -198,12 +194,13 @@ def image_process(cv_image, pinkLine, state, speed):
       timer = 55
     if state == 2:
       timer = 60
+    if state == 4 and turn_complete == True:
+      timer = 25
 
     if state == 3 and timer > 0:
       a = 7
     else:
       state += 1
-    print(state)
 
   if state == 4 and turn_complete == False:
     state = 3
@@ -224,6 +221,11 @@ def image_process(cv_image, pinkLine, state, speed):
       speed = 0.15
       left, right = grass(cv_image)
   else: 
+    if timer > 0:
+      left = 100
+      right = 700
+      speed = 0
+      timer -= 1
     if tunnel:
       left, right = tunnelDrive(cv_image)
       speed = 0.1
@@ -247,7 +249,6 @@ def Callback(msg):
     control.publish(move)
 
 rospy.init_node('biggerWins')
-scoreTracker = rospy.Publisher('/score_tracker', String, queue_size=1)
 control = rospy.Publisher('/R1/cmd_vel', Twist, queue_size=1)
 camera = rospy.Subscriber('/R1/pi_camera/image_raw', Image, Callback)
 

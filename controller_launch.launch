@@ -8,11 +8,11 @@
 		output="screen">
 	</node>
 
-	<!--
+	
 	<node pkg="my_controller"
 		type="comp_drive.py"
 		name="move_robot2" 
 		output="screen">
-	</node>-->
+	</node>
 
 </launch>
